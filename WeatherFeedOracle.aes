@@ -1,0 +1,34 @@
+@compiler >= 7
+
+include "String.aes"
+include "Frac.aes"
+include "Option.aes"
+
+contract WeatherUsingCountry = 
+    type o = oracle(string, string)
+    type oq = oracle_query(string,string)
+
+    type state = o
+    entrypoint init(oracle: o) = oracle
+
+    entrypoint queryFee() = 
+        Oracle.query_fee(state)
+
+    //passing country name the weather parameter
+    payable stateful entrypoint queryTemperature(country : string) = 
+        let fee = queryFee()
+        require(Call.value == fee, String.concat("Amount_not_equal_to_fee", Int.to_str(fee)))
+        require(Oracle.check(state), "Oracle_check_has_been_failed")
+        Oracle.query(state, country, fee, RelativeTTL(10), RelativeTTL(10))
+
+
+    entrypoint checkTemperature(query : oq) : option(string) = 
+        Oracle.get_answer(state, query)
+
+    entrypoint checkTempInFrac(query : oq) : option(Frac.frac) = 
+        switch(checkTemperature(query))
+            None => None
+            Some(str) => switch(String.to_int(str)) //converting string to integer
+                None => None
+                Some(temp) => Some(Frac.make_frac(temp, 10^18))
+
